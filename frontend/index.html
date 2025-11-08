@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jain Gyan Yatra - AI Learning Companion</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <div class="jain-symbol">🕉️</div>
+                    <div>
+                        <div class="app-title">Jain Gyan Yatra</div>
+                        <div class="app-subtitle">AI Learning Companion</div>
+                    </div>
+                </div>
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-value" id="docCount">0</div>
+                        <div class="stat-label">DOCUMENTS</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-value" id="sessionCount">0</div>
+                        <div class="stat-label">SESSIONS</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="history-section">
+                <div class="history-title">Recent Conversations</div>
+                <div id="historyList"></div>
+            </div>
+
+            <button class="new-chat-btn" onclick="startNewChat()">
+                ➕ New Conversation
+            </button>
+        </div>
+
+        <!-- Main Chat Area -->
+        <div class="main-content">
+            <div class="chat-header">
+                <div class="chat-title">Learn About Jainism</div>
+                <div class="audio-controls">
+                    <div class="language-selector">
+                        <button class="lang-btn active" onclick="setLanguage('en')" id="lang-en">English</button>
+                        <button class="lang-btn" onclick="setLanguage('hi')" id="lang-hi">हिंदी</button>
+                        <button class="lang-btn" onclick="setLanguage('mr')" id="lang-mr">मारवाड़ी</button>
+                    </div>
+                    <div class="audio-toggle">
+                        <input type="checkbox" id="audioToggle" checked>
+                        <label for="audioToggle">🔊 Audio</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-container" id="chatContainer">
+                <div class="welcome-screen">
+                    <div class="welcome-icon">🕉️</div>
+                    <h1 class="welcome-title">Welcome to Your Learning Journey</h1>
+                    <p class="welcome-subtitle">
+                        I'm here to guide you through the beautiful philosophy and practices of Jainism.
+                        Whether you're just beginning or deepening your understanding, I'm here to help.
+                    </p>
+                    <div class="quick-actions">
+                        <div class="quick-action-card" onclick="sendQuickMessage('What is Jainism?')">
+                            <div class="quick-action-icon">📖</div>
+                            <div class="quick-action-title">Introduction to Jainism</div>
+                        </div>
+                        <div class="quick-action-card" onclick="sendQuickMessage('Tell me about Ahimsa')">
+                            <div class="quick-action-icon">🕊️</div>
+                            <div class="quick-action-title">Ahimsa - Non-Violence</div>
+                        </div>
+                        <div class="quick-action-card" onclick="sendQuickMessage('Who was Mahavira?')">
+                            <div class="quick-action-icon">👤</div>
+                            <div class="quick-action-title">Life of Mahavira</div>
+                        </div>
+                        <div class="quick-action-card" onclick="sendQuickMessage('How can I practice Jainism daily?')">
+                            <div class="quick-action-icon">🧘</div>
+                            <div class="quick-action-title">Daily Practices</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="input-wrapper">
+                    <input 
+                        type="text" 
+                        id="messageInput" 
+                        placeholder="Ask me anything about Jainism..."
+                        onkeypress="handleKeyPress(event)"
+                    >
+                    <button id="sendBtn" onclick="sendMessage()">Send ➤</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
