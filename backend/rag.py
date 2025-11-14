@@ -1,4 +1,4 @@
-# backend/rag.py
+# backend/rag.py - BIDIRECTIONAL FIX
 
 from typing import List, Dict, Optional
 import sys
@@ -111,36 +111,112 @@ Relevance: {score:.2f}
         
         return "\n".join(context_parts)
     
-    def _get_language_instruction(self, language: str) -> str:
+    def _detect_language_in_history(self, chat_history: Optional[List[Dict]]) -> str:
         """
-        Get language-specific instruction for the system prompt
+        Detect what language was used in recent chat history
         
         Args:
-            language: Language code (en, hi, mr)
+            chat_history: Previous messages
+            
+        Returns:
+            Detected language code ('en', 'hi', 'mr', 'mixed', or 'unknown')
+        """
+        if not chat_history or len(chat_history) == 0:
+            return 'unknown'
+        
+        # Check last assistant message
+        for msg in reversed(chat_history):
+            if msg.get('role') == 'assistant':
+                content = msg.get('content', '')
+                
+                # Check for Devanagari script (Hindi/Marwadi)
+                if any('\u0900' <= char <= '\u097F' for char in content):
+                    return 'hi'  # or 'mr', both use Devanagari
+                
+                # Check for English (basic Latin characters)
+                elif any('a' <= char.lower() <= 'z' for char in content):
+                    return 'en'
+        
+        return 'unknown'
+    
+    def _get_language_instruction(self, language: str, history_language: str = 'unknown') -> str:
+        """
+        FIXED: Get language-specific instruction with BIDIRECTIONAL support
+        
+        Args:
+            language: Target language code (en, hi, mr)
+            history_language: Language detected in chat history
             
         Returns:
             Language instruction string
         """
+        
+        # If history is in different language, be MORE forceful
+        is_switching = (history_language != 'unknown' and 
+                       history_language != language and 
+                       history_language != 'mixed')
+        
         language_instructions = {
-            "en": "",  # English is default, no special instruction needed
-            "hi": """
+            "en": f"""
+{"⚠️ LANGUAGE SWITCH DETECTED ⚠️" if is_switching else ""}
+{"YOU ARE NOW SWITCHING TO ENGLISH - STOP USING HINDI/MARWADI!" if is_switching else ""}
 
-CRITICAL LANGUAGE INSTRUCTION:
-You MUST respond ENTIRELY in Hindi (हिंदी). 
-- Translate all your responses to Hindi
-- Use Devanagari script
-- Keep the warm, teaching style but in Hindi
-- All explanations, examples, and stories should be in Hindi
-Example: Instead of "Ahimsa means non-violence", say "अहिंसा का अर्थ है अहिंसा"
+LANGUAGE REQUIREMENT: RESPOND IN ENGLISH
+
+MANDATORY RULES:
+1. Use ONLY English language - NO Hindi, NO Marwadi, NO Devanagari script
+2. {"Even though previous messages were in Hindi/Marwadi, respond in ENGLISH now" if is_switching else "Respond naturally in English"}
+3. Translate any Hindi/Marwadi terms to English
+4. Use Latin alphabet only (A-Z, a-z)
+5. Keep the warm, teaching style in English
+
+{"EXAMPLES:" if is_switching else ""}
+{"❌ WRONG: 'अहिंसा का अर्थ है non-violence'" if is_switching else ""}
+{"✅ CORRECT: 'Ahimsa means non-violence and is the cornerstone of Jainism'" if is_switching else ""}
+
+{"IGNORE any Hindi/Marwadi in conversation history - respond ONLY in English." if is_switching else ""}
 """,
-            "mr": """
+            "hi": f"""
+{"⚠️ LANGUAGE SWITCH DETECTED ⚠️" if is_switching else ""}
+{"YOU ARE NOW SWITCHING TO HINDI - STOP USING ENGLISH!" if is_switching else ""}
 
-CRITICAL LANGUAGE INSTRUCTION:
-You MUST respond ENTIRELY in Hindi/Marwadi (हिंदी/मारवाड़ी).
-- Translate all your responses to Hindi (as Marwadi uses similar script)
-- Use Devanagari script
-- Keep the warm, teaching style but in Hindi
-- All explanations, examples, and stories should be in Hindi
+⚠️ CRITICAL LANGUAGE REQUIREMENT - HIGHEST PRIORITY ⚠️
+YOU MUST RESPOND 100% IN HINDI (हिंदी) - NO EXCEPTIONS!
+
+MANDATORY RULES:
+1. DO NOT use ANY English words - translate EVERYTHING to Hindi
+2. Use ONLY Devanagari script (देवनागरी) - NO Latin alphabet
+3. {"Even though ALL previous messages were in English, YOU MUST respond in Hindi now" if is_switching else "Respond entirely in Hindi"}
+4. Translate ALL technical terms to Hindi:
+   - "Ahimsa" → "अहिंसा"
+   - "karma" → "कर्म"
+   - "Jainism" → "जैन धर्म"
+   - "non-violence" → "अहिंसा"
+5. Keep the warm, teaching style but IN HINDI
+
+EXAMPLES:
+❌ WRONG: "Ahimsa means non-violence"
+✅ CORRECT: "अहिंसा का अर्थ है अहिंसा और यह जैन धर्म का सबसे महत्वपूर्ण सिद्धांत है"
+
+{"IGNORE any English in conversation history - respond ONLY in Hindi." if is_switching else ""}
+""",
+            "mr": f"""
+{"⚠️ LANGUAGE SWITCH DETECTED ⚠️" if is_switching else ""}
+{"YOU ARE NOW SWITCHING TO MARWADI - STOP USING ENGLISH!" if is_switching else ""}
+
+⚠️ CRITICAL LANGUAGE REQUIREMENT - HIGHEST PRIORITY ⚠️
+YOU MUST RESPOND 100% IN MARWADI-STYLE HINDI (मारवाड़ी हिंदी) - NO EXCEPTIONS!
+
+MANDATORY RULES:
+1. DO NOT use ANY English words - translate EVERYTHING to Marwadi/Hindi
+2. Use ONLY Devanagari script (देवनागरी)
+3. Use Rajasthani/Marwadi Hindi dialect when speaking
+4. {"Even though ALL previous messages were in English, YOU MUST respond in Marwadi Hindi now" if is_switching else "Respond in Marwadi Hindi"}
+5. Keep the warm, teaching style but IN MARWADI HINDI
+
+NOTE: Marwadi is a Rajasthani dialect. Use Hindi with Rajasthani flavor.
+
+{"IGNORE any English in conversation history - respond ONLY in Marwadi/Hindi." if is_switching else ""}
 """
         }
         
@@ -152,7 +228,7 @@ You MUST respond ENTIRELY in Hindi/Marwadi (हिंदी/मारवाड�
         chat_history: Optional[List[Dict]] = None,
         user_profile: Optional[Dict] = None,
         include_sources: bool = True,
-        language: str = "en"  # NEW: Add language parameter
+        language: str = "en"
     ) -> Dict:
         """
         Generate response using RAG pipeline
@@ -181,20 +257,43 @@ You MUST respond ENTIRELY in Hindi/Marwadi (हिंदी/मारवाड�
         # Step 2: Format context
         context = self.format_context(retrieved)
         
-        # Step 3: Get base system prompt and add language instruction
+        # Step 3: Detect language in history
+        history_language = self._detect_language_in_history(chat_history)
+        
+        # Step 4: Get system prompt with BIDIRECTIONAL language instruction
         base_system_prompt = self.llm._get_jain_teacher_prompt()
-        language_instruction = self._get_language_instruction(language)
+        language_instruction = self._get_language_instruction(language, history_language)
         system_prompt = base_system_prompt + language_instruction
         
-        # Step 4: Generate response with context and language-aware system prompt
+        # Step 5: Filter chat history ALWAYS when switching languages
+        filtered_history = None
+        if chat_history:
+            # If language is switching, limit history to reduce contamination
+            if history_language != 'unknown' and history_language != language:
+                # Language switch detected - use minimal history
+                filtered_history = chat_history[-1:] if len(chat_history) > 0 else None
+                print(f"🔄 Language switch detected: {history_language} → {language}")
+                print(f"   Using limited history: {len(filtered_history) if filtered_history else 0} messages")
+            else:
+                # Same language - use more history
+                filtered_history = chat_history[-5:] if len(chat_history) > 5 else chat_history
+        
+        # Step 6: Handle very short queries like "Hi" by adding context
+        enhanced_query = query
+        if len(query.strip()) < 10 and not any(c.isalnum() for c in query if ord(c) > 127):
+            # Short English-like query - add language hint
+            lang_name = {"en": "English", "hi": "Hindi", "mr": "Marwadi"}
+            enhanced_query = f"{query} (Please respond in {lang_name.get(language, 'English')})"
+        
+        # Step 7: Generate response with language-aware system prompt
         llm_response = self.llm.generate_response(
-            user_message=query,
+            user_message=enhanced_query,
             context=context if context else "",
-            chat_history=chat_history,
-            system_prompt=system_prompt  # Use language-specific prompt
+            chat_history=filtered_history,
+            system_prompt=system_prompt
         )
         
-        # Step 5: Prepare sources for citation
+        # Step 8: Prepare sources for citation
         sources = []
         if include_sources and retrieved['documents']:
             for metadata, score in zip(retrieved['metadatas'], retrieved['scores']):
@@ -207,7 +306,7 @@ You MUST respond ENTIRELY in Hindi/Marwadi (हिंदी/मारवाड�
                 }
                 sources.append(source)
         
-        # Step 6: Return complete response
+        # Step 9: Return complete response
         return {
             "success": llm_response.get("success", True),
             "response": llm_response.get("message", ""),
@@ -222,7 +321,7 @@ You MUST respond ENTIRELY in Hindi/Marwadi (हिंदी/मारवाड�
         query: str,
         knowledge_level: str = "beginner",
         chat_history: Optional[List[Dict]] = None,
-        language: str = "en"  # NEW: Add language parameter
+        language: str = "en"
     ) -> Dict:
         """
         Generate adaptive response based on user's knowledge level and language
@@ -241,7 +340,7 @@ You MUST respond ENTIRELY in Hindi/Marwadi (हिंदी/मारवाड�
             query=query,
             chat_history=chat_history,
             user_profile={"knowledge_level": knowledge_level},
-            language=language  # Pass language through
+            language=language
         )
         
         return response

@@ -52,9 +52,9 @@ class AudioService:
             return None
         
         try:
-            # Generate filename from text hash
-            text_hash = hashlib.md5(text.encode()).hexdigest()[:12]
-            audio_file = AUDIO_DIR / f"tts_{text_hash}.mp3"
+            # Generate filename from text hash AND language
+            text_hash = hashlib.md5(f"{text}_{language}".encode()).hexdigest()[:12]
+            audio_file = AUDIO_DIR / f"tts_{language}_{text_hash}.mp3"
             
             # Check if already generated
             if audio_file.exists():
@@ -64,6 +64,8 @@ class AudioService:
             # Select voice based on language
             if voice is None:
                 voice = self._get_voice_for_language(language)
+            
+            print(f"🎤 Generating {language} audio with voice: {voice}")
             
             # Generate audio (await directly, don't use asyncio.run)
             await self._generate_audio(text, str(audio_file), voice)
@@ -105,19 +107,25 @@ class AudioService:
     
     def _get_voice_for_language(self, language: str) -> str:
         """
-        Get appropriate voice for language
+        FIXED: Get appropriate voice for language with better distinction
         
-        Available voices:
-        - English: en-US-AriaNeural (female), en-US-GuyNeural (male)
-        - Hindi: hi-IN-SwaraNeural (female), hi-IN-MadhurNeural (male)
-        - For Marwadi: Use Hindi voices
+        Edge TTS voices available:
+        - English: en-US-AriaNeural (female, clear), en-US-GuyNeural (male)
+        - Hindi: hi-IN-SwaraNeural (female, natural), hi-IN-MadhurNeural (male)
+        - Marathi: mr-IN-AarohiNeural (female), mr-IN-ManoharNeural (male)
+        
+        IMPORTANT: Use DIFFERENT voices for Hindi and Marwadi to avoid confusion!
         """
         voices = {
-            "en": "en-US-AriaNeural",  # Clear, warm female voice
-            "hi": "hi-IN-SwaraNeural",  # Hindi female voice
-            "mr": "hi-IN-SwaraNeural",  # Use Hindi for Marwadi
+            "en": "en-US-AriaNeural",      # English - Clear female voice
+            "hi": "hi-IN-SwaraNeural",     # Hindi - Natural female voice (NOT Marathi!)
+            "mr": "mr-IN-AarohiNeural",    # Marwadi/Marathi - Distinct Marathi female voice
         }
-        return voices.get(language, "en-US-AriaNeural")
+        
+        selected_voice = voices.get(language, "en-US-AriaNeural")
+        print(f"🗣️  Selected voice for '{language}': {selected_voice}")
+        
+        return selected_voice
 
 
 # Initialize singleton
@@ -135,29 +143,38 @@ async def test_audio_async():
         print("   Install: pip install edge-tts")
         return
     
-    test_text = """Ahimsa, meaning non-violence, is the cornerstone principle of Jainism. 
-    It extends beyond physical violence to include harm through thoughts, words, and actions."""
+    test_cases = [
+        {
+            "language": "en",
+            "text": "Ahimsa, meaning non-violence, is the cornerstone principle of Jainism."
+        },
+        {
+            "language": "hi",
+            "text": "अहिंसा जैन धर्म का मूल सिद्धांत है जो सभी जीवों के प्रति करुणा सिखाता है।"
+        },
+        {
+            "language": "mr",
+            "text": "अहिंसा हे जैन धर्माचे मूलभूत तत्त्व आहे."
+        }
+    ]
     
-    print("🎤 Generating audio...")
-    print(f"Text: {test_text[:100]}...\n")
-    
-    # Test English
-    print("Testing English voice...")
-    audio_path = await audio_service.text_to_speech_async(test_text, language="en")
-    
-    if audio_path:
-        print(f"✅ English audio generated!")
-        print(f"📁 File: {audio_path}")
-        print(f"📊 Size: {Path(audio_path).stat().st_size / 1024:.1f} KB\n")
-    
-    # Test Hindi
-    hindi_text = "जैन धर्म में अहिंसा सबसे महत्वपूर्ण सिद्धांत है।"
-    print("Testing Hindi voice...")
-    audio_path_hi = await audio_service.text_to_speech_async(hindi_text, language="hi")
-    
-    if audio_path_hi:
-        print(f"✅ Hindi audio generated!")
-        print(f"📁 File: {audio_path_hi}")
+    for i, test_case in enumerate(test_cases, 1):
+        lang = test_case["language"]
+        text = test_case["text"]
+        
+        print(f"\n{'='*60}")
+        print(f"Test {i}: {lang.upper()} voice")
+        print(f"{'='*60}")
+        print(f"Text: {text[:100]}...\n")
+        
+        audio_path = await audio_service.text_to_speech_async(text, language=lang)
+        
+        if audio_path:
+            print(f"✅ {lang.upper()} audio generated!")
+            print(f"📁 File: {audio_path}")
+            print(f"📊 Size: {Path(audio_path).stat().st_size / 1024:.1f} KB")
+        else:
+            print(f"❌ Failed to generate {lang.upper()} audio")
     
     print("\n" + "="*60)
     print("✅ Audio tests complete!")
